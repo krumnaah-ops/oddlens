@@ -1,0 +1,38 @@
+# Netlify site configuration.
+
+[build]
+  # Static site: the app is a single index.html plus serverless functions.
+  publish = "."
+
+[functions]
+  # All serverless + scheduled functions live here.
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# ---------------------------------------------------------------------------
+# Functions overview (paths & schedules are declared in-code via each
+# function's exported `config`, which Netlify reads at deploy time):
+#
+#   netlify/functions/update-mlb-props.mts
+#     - Scheduled function, cron "0 * * * *" (hourly).
+#     - Only pulls at the discrete Central-Time pull hours (10am, 12pm, 2pm,
+#       4pm, 6pm); on any other hour the run is a no-op. In-window it discovers
+#       games via the free /events endpoint, computes the active daily window,
+#       and only fetches/stores player props when in-window.
+#
+#   netlify/functions/fetch-odds.mts
+#     - Scheduled writer, cron "0 * * * *" (hourly).
+#     - Only pulls at the discrete Central-Time pull hours (10am, 12pm, 2pm,
+#       4pm, 6pm); on any other hour the run is a no-op. In-window it discovers
+#       the slate and upserts game lines + props into the Netlify Database.
+#
+#   netlify/functions/mlb-props.mts
+#     - Public API at /api/mlb-props. Serves the cached payload from Netlify
+#       Blobs with no upstream API calls.
+#
+# The functions run hourly but only act on the Central-Time pull hours, which
+# keeps those wall-clock times correct across daylight-saving changes (cron is
+# evaluated in UTC). To change the pull hours (start/end/step or timezone), edit
+# PULL_WINDOW_* in netlify/lib/config.ts. To change markets/books/relevance,
+# edit netlify/lib/config.ts.
+# ---------------------------------------------------------------------------

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statcast Exit Velocity & Barrels — Baseball Lens</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #13151c;
+    --surface: #1a1d27;
+    --surface2: #20242f;
+    --border: #262b3a;
+    --border-bright: #333b50;
+    --text: #dde3f0;
+    --muted: #7a8499;
+    --accent: #78c486;
+    --accent2: #5b9cf6;
+    --green: #4cbc68;
+    --red: #e85c52;
+    --yellow: #d9ab38;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+
+  .header-actions { display: flex; align-items: center; gap: 14px; }
+
+  button.refresh {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--bg);
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  button.refresh:hover { opacity: 0.85; }
+  button.refresh:disabled { opacity: 0.5; cursor: default; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 20px; }
+
+  .meta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .meta-bar b { color: var(--text); font-weight: 600; }
+  .pill {
+    padding: 2px 8px; border-radius: 999px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .pill.live { background: rgba(76,188,104,0.15); color: var(--green); }
+  .pill.cache { background: rgba(217,171,56,0.15); color: var(--yellow); }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    margin-bottom: 18px;
+  }
+  .toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .toggle button {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    background: var(--surface); color: var(--muted); border: none;
+    padding: 7px 16px; cursor: pointer; transition: all 0.15s ease;
+  }
+  .toggle button.active { background: var(--accent2); color: var(--bg); }
+  .toggle button:not(.active):hover { color: var(--text); background: var(--surface2); }
+
+  .search {
+    font-family: var(--mono); font-size: 12px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 12px; min-width: 220px;
+  }
+  .search:focus { outline: none; border-color: var(--border-bright); }
+
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    text-align: right;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    position: sticky; top: 0;
+    background: var(--surface2);
+  }
+  thead th:hover { color: var(--text); }
+  thead th.l { text-align: left; }
+  thead th.sorted { color: var(--accent2); }
+  thead th .arrow { font-size: 9px; }
+
+  tbody td {
+    padding: 9px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  tbody td.l { text-align: left; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td.rank { color: var(--muted); }
+  .player { font-family: var(--sans); font-weight: 500; }
+  .hi { color: var(--accent); }
+  .hot { color: var(--red); }
+
+  .state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .state .big { font-size: 16px; color: var(--text); margin-bottom: 6px; }
+  .spinner {
+    width: 26px; height: 26px; margin: 0 auto 14px;
+    border: 3px solid var(--border-bright); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .state.error .big { color: var(--red); }
+
+  footer {
+    text-align: center; padding: 24px; color: var(--muted); font-size: 11px;
+    border-top: 1px solid var(--border); margin-top: 30px;
+  }
+  footer a { color: var(--accent2); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">STATCAST <span>/ exit velocity &amp; barrels</span></div>
+    <div class="header-actions">
+      <a class="logo" style="font-size:11px;color:var(--muted)"
+         href="https://baseballsavant.mlb.com" target="_blank" rel="noopener">
+        Data from Baseball Savant ↗
+      </a>
+      <button class="refresh" id="refreshBtn">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="metaBar"></div>
+    <div class="controls">
+      <div class="toggle">
+        <button id="tabBatters" class="active" data-type="batter">⚾ Batters</button>
+        <button id="tabPitchers" data-type="pitcher">🔥 Pitchers</button>
+      </div>
+      <input class="search" id="search" type="search" placeholder="Filter by player…" autocomplete="off">
+    </div>
+    <div id="content">
+      <div class="state"><div class="spinner"></div><div>Loading Statcast leaderboard…</div></div>
+    </div>
+  </div>
+
+  <footer>
+    Exit velocity and barrel metrics are sourced from
+    <a href="https://baseballsavant.mlb.com" target="_blank" rel="noopener">Baseball Savant / MLB Statcast</a>
+    — the same leaderboard the <code>pybaseball</code> library reads.
+    For informational purposes only.
+  </footer>
+
+<script>
+  const API = '/api/statcast';
+
+  // Columns rendered in the leaderboard, in display order. `key` matches the
+  // record field; `fmt` formats the cell; `dir` is the default sort direction.
+  const COLUMNS = [
+    { key: 'player', label: 'Player', cls: 'l', fmt: v => esc(v), dir: 'asc', sortText: true },
+    { key: 'battedBallEvents', label: 'BBE', fmt: n0 },
+    { key: 'avgExitVelocity', label: 'Avg EV', fmt: n1, hot: 90 },
+    { key: 'maxExitVelocity', label: 'Max EV', fmt: n1, hot: 113 },
+    { key: 'avgBestExitVelocity', label: 'EV (top 50%)', fmt: n1 },
+    { key: 'hardHitPct', label: 'Hard-Hit%', fmt: pct, hot: 45 },
+    { key: 'barrels', label: 'Barrels', fmt: n0 },
+    { key: 'barrelPct', label: 'Barrel%', fmt: pct, hot: 12 },
+    { key: 'barrelsPerPa', label: 'Brl/PA%', fmt: pct },
+    { key: 'sweetSpotPct', label: 'SwSpot%', fmt: pct },
+    { key: 'avgLaunchAngle', label: 'LA°', fmt: n1 },
+    { key: 'avgDistance', label: 'Avg Dist', fmt: n0 },
+    { key: 'maxDistance', label: 'Max Dist', fmt: n0 },
+  ];
+
+  let state = { type: 'batter', sortKey: 'barrels', sortDir: 'desc', data: null, query: '' };
+
+  // --- formatting helpers --------------------------------------------------
+  function n0(v) { return v == null ? '—' : Math.round(v).toLocaleString(); }
+  function n1(v) { return v == null ? '—' : Number(v).toFixed(1); }
+  function pct(v) { return v == null ? '—' : Number(v).toFixed(1) + '%'; }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+      { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
+    ));
+  }
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+    } catch (e) { return iso; }
+  }
+
+  // --- rendering -----------------------------------------------------------
+  function renderMeta(data) {
+    const pill = data.source === 'live'
+      ? '<span class="pill live">live</span>'
+      : `<span class="pill cache">${esc(data.source || 'cache')}</span>`;
+    const n = state.type === 'pitcher' ? data.counts.pitchers : data.counts.batters;
+    return `
+      <div class="meta-bar">
+        <div>Season <b>${esc(data.season)}</b></div>
+        <div>${pill}</div>
+        <div>Players <b>${n}</b></div>
+        <div>Min BBE <b>${esc(data.minBattedBalls)}</b></div>
+        <div>Updated <b>${fmtTime(data.generatedAt)}</b></div>
+      </div>`;
+  }
+
+  function rows() {
+    const all = (state.type === 'pitcher' ? state.data.pitchers : state.data.batters) || [];
+    const q = state.query.trim().toLowerCase();
+    const filtered = q ? all.filter(r => (r.player || '').toLowerCase().includes(q)) : all.slice();
+
+    const col = COLUMNS.find(c => c.key === state.sortKey);
+    const dir = state.sortDir === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      const av = a[state.sortKey], bv = b[state.sortKey];
+      if (col && col.sortText) return dir * String(av).localeCompare(String(bv));
+      // Nulls always sort to the bottom regardless of direction.
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return dir * (av - bv);
+    });
+    return filtered;
+  }
+
+  function renderTable() {
+    const data = rows();
+    const head = COLUMNS.map(c => {
+      const sorted = c.key === state.sortKey;
+      const arrow = sorted ? `<span class="arrow">${state.sortDir === 'asc' ? '▲' : '▼'}</span>` : '';
+      return `<th class="${c.cls || ''}${sorted ? ' sorted' : ''}" data-key="${c.key}">${esc(c.label)} ${arrow}</th>`;
+    }).join('');
+
+    if (!data.length) {
+      return `<div class="state"><div class="big">No players match</div><div>Try clearing the filter.</div></div>`;
+    }
+
+    const body = data.map((r, i) => {
+      const cells = COLUMNS.map((c, ci) => {
+        const v = r[c.key];
+        let cls = c.cls || '';
+        if (c.hot && typeof v === 'number' && v >= c.hot) cls += ' hot';
+        const inner = ci === 0
+          ? `<span class="rank">${i + 1}.</span> <span class="player">${c.fmt(v)}</span>`
+          : c.fmt(v);
+        return `<td class="${cls}">${inner}</td>`;
+      }).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+
+    return `
+      <div class="table-card">
+        <table>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // --- DOM wiring ----------------------------------------------------------
+  const contentEl = document.getElementById('content');
+  const metaEl = document.getElementById('metaBar');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const searchEl = document.getElementById('search');
+  const tabBatters = document.getElementById('tabBatters');
+  const tabPitchers = document.getElementById('tabPitchers');
+
+  function paint() {
+    if (!state.data) return;
+    metaEl.innerHTML = renderMeta(state.data);
+    contentEl.innerHTML = renderTable();
+    contentEl.querySelectorAll('thead th').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.getAttribute('data-key');
+        const col = COLUMNS.find(c => c.key === key);
+        if (state.sortKey === key) {
+          state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortKey = key;
+          state.sortDir = col && col.dir ? col.dir : 'desc';
+        }
+        paint();
+      });
+    });
+  }
+
+  function setType(type) {
+    state.type = type;
+    tabBatters.classList.toggle('active', type === 'batter');
+    tabPitchers.classList.toggle('active', type === 'pitcher');
+    paint();
+  }
+
+  async function load(refresh) {
+    refreshBtn.disabled = true;
+    contentEl.innerHTML =
+      '<div class="state"><div class="spinner"></div><div>Loading Statcast leaderboard…</div></div>';
+    metaEl.innerHTML = '';
+    try {
+      const url = API + '?type=both' + (refresh ? '&refresh=1' : '');
+      const res = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      state.data = data;
+      paint();
+    } catch (err) {
+      metaEl.innerHTML = '';
+      contentEl.innerHTML =
+        '<div class="state error"><div class="big">Couldn’t load Statcast data</div>' +
+        '<div>' + esc(err.message) + '. Try refreshing in a moment.</div></div>';
+    } finally {
+      refreshBtn.disabled = false;
+    }
+  }
+
+  tabBatters.addEventListener('click', () => setType('batter'));
+  tabPitchers.addEventListener('click', () => setType('pitcher'));
+  searchEl.addEventListener('input', () => { state.query = searchEl.value; paint(); });
+  refreshBtn.addEventListener('click', () => load(true));
+  load(false);
+</script>
+</body>
+</html>

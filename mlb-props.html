@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLB Player Props — Baseball Lens</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #13151c;
+    --surface: #1a1d27;
+    --surface2: #20242f;
+    --border: #262b3a;
+    --border-bright: #333b50;
+    --text: #dde3f0;
+    --muted: #7a8499;
+    --accent: #78c486;
+    --accent2: #5b9cf6;
+    --green: #4cbc68;
+    --red: #e85c52;
+    --yellow: #d9ab38;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+
+  .header-actions { display: flex; align-items: center; gap: 14px; }
+
+  button.refresh {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--bg);
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  button.refresh:hover { opacity: 0.85; }
+  button.refresh:disabled { opacity: 0.5; cursor: default; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px; }
+
+  .meta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .meta-bar b { color: var(--text); font-weight: 600; }
+  .pill {
+    padding: 2px 8px; border-radius: 999px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .pill.live { background: rgba(76,188,104,0.15); color: var(--green); }
+  .pill.cache { background: rgba(217,171,56,0.15); color: var(--yellow); }
+
+  .game {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+  .game-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .matchup { font-size: 15px; font-weight: 600; }
+  .matchup .at { color: var(--muted); font-weight: 400; margin: 0 6px; }
+  .game-time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    padding: 14px 18px 8px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    text-align: right;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th.l, tbody td.l { text-align: left; }
+  tbody td {
+    padding: 9px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  tbody tr.prop-row { cursor: pointer; }
+  tbody tr.prop-row:hover { background: var(--surface2); }
+  .player { font-family: var(--sans); font-weight: 500; }
+  .market { color: var(--muted); font-family: var(--sans); }
+  .odds-pos { color: var(--green); }
+  .odds-neg { color: var(--text); }
+  .prob { color: var(--accent2); }
+  .caret { color: var(--muted); display: inline-block; width: 12px; }
+
+  .book-detail { background: var(--bg); }
+  .book-detail td { padding: 0; border-bottom: 1px solid var(--border); }
+  .book-table { width: 100%; }
+  .book-table th, .book-table td {
+    padding: 6px 12px; font-size: 11px; border-bottom: 1px solid var(--border);
+  }
+  .book-table tr:last-child td { border-bottom: none; }
+  .book-name { color: var(--muted); }
+
+  .state {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+  }
+  .state .big { font-size: 16px; color: var(--text); margin-bottom: 6px; }
+  .spinner {
+    width: 26px; height: 26px; margin: 0 auto 14px;
+    border: 3px solid var(--border-bright); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .state.error .big { color: var(--red); }
+
+  footer {
+    text-align: center; padding: 24px; color: var(--muted); font-size: 11px;
+    border-top: 1px solid var(--border); margin-top: 30px;
+  }
+  footer a { color: var(--accent2); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">MLB PROPS <span>/ no-vig fair odds</span></div>
+    <div class="header-actions">
+      <a class="logo" style="font-size:11px;color:var(--muted)"
+         href="https://the-odds-api.com" target="_blank" rel="noopener">
+        Data from The Odds API ↗
+      </a>
+      <button class="refresh" id="refreshBtn">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="metaBar"></div>
+    <div id="content">
+      <div class="state"><div class="spinner"></div><div>Loading player props…</div></div>
+    </div>
+  </div>
+
+  <footer>
+    Player-prop odds and no-vig fair pricing are sourced from
+    <a href="https://the-odds-api.com" target="_blank" rel="noopener">The Odds API</a>.
+    For informational purposes only.
+  </footer>
+
+<script>
+  const API = '/api/mlb-props';
+
+  // --- formatting helpers --------------------------------------------------
+  function fmtOdds(v) {
+    if (v == null) return '—';
+    return v > 0 ? '+' + v : '' + v;
+  }
+  function oddsClass(v) {
+    if (v == null) return '';
+    return v > 0 ? 'odds-pos' : 'odds-neg';
+  }
+  function fmtProb(p) {
+    if (p == null) return '—';
+    return (p * 100).toFixed(1) + '%';
+  }
+  function fmtLine(p) {
+    return p == null ? '' : (p > 0 ? 'o/u ' + p : '' + p);
+  }
+  function fmtTime(iso) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('en-US', {
+        weekday: 'short', hour: 'numeric', minute: '2-digit',
+        timeZoneName: 'short'
+      });
+    } catch (e) { return iso; }
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+      { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
+    ));
+  }
+
+  // --- rendering -----------------------------------------------------------
+  function renderBookDetail(line) {
+    const rows = line.books.map(b => `
+      <tr>
+        <td class="book-name">${esc(b.bookTitle)}</td>
+        <td class="${oddsClass(b.over)}" style="text-align:right">${fmtOdds(b.over)}</td>
+        <td class="${oddsClass(b.under)}" style="text-align:right">${fmtOdds(b.under)}</td>
+        <td class="${oddsClass(b.fairOver)}" style="text-align:right">${fmtOdds(b.fairOver)}</td>
+        <td class="${oddsClass(b.fairUnder)}" style="text-align:right">${fmtOdds(b.fairUnder)}</td>
+        <td style="text-align:right;color:var(--muted)">${b.holdPct == null ? '—' : b.holdPct + '%'}</td>
+      </tr>`).join('');
+    return `
+      <td colspan="6">
+        <table class="book-table">
+          <thead><tr>
+            <th class="l" style="text-align:left">Book</th>
+            <th style="text-align:right">Over</th>
+            <th style="text-align:right">Under</th>
+            <th style="text-align:right">Fair Over</th>
+            <th style="text-align:right">Fair Under</th>
+            <th style="text-align:right">Hold</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </td>`;
+  }
+
+  function renderPropTable(lines) {
+    if (!lines.length) {
+      return '<div style="padding:10px 18px 16px;color:var(--muted)">No props available.</div>';
+    }
+    const body = lines.map((line, i) => {
+      // Fair odds derived from book consensus probability.
+      const cp = line.consensusOverProb;
+      const fairOver = cp == null ? null
+        : (cp > 0.5 ? -Math.round((cp/(1-cp))*100) : Math.round(((1-cp)/cp)*100));
+      const fairUnder = cp == null ? null
+        : ((1-cp) > 0.5 ? -Math.round(((1-cp)/cp)*100) : Math.round((cp/(1-cp))*100));
+      return `
+        <tr class="prop-row" data-idx="${i}">
+          <td class="l"><span class="caret">▸</span><span class="player">${esc(line.player)}</span></td>
+          <td class="l market">${esc(line.marketLabel)}</td>
+          <td>${fmtLine(line.point)}</td>
+          <td class="prob">${fmtProb(cp)}</td>
+          <td class="${oddsClass(fairOver)}">${fmtOdds(fairOver)}</td>
+          <td class="${oddsClass(fairUnder)}">${fmtOdds(fairUnder)}</td>
+        </tr>
+        <tr class="book-detail" data-detail="${i}" style="display:none">
+          ${renderBookDetail(line)}
+        </tr>`;
+    }).join('');
+
+    return `
+      <table>
+        <thead><tr>
+          <th class="l">Player</th>
+          <th class="l">Market</th>
+          <th>Line</th>
+          <th>Fair Over %</th>
+          <th>Fair Over</th>
+          <th>Fair Under</th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+  }
+
+  function renderGame(game) {
+    const batter = renderPropTable(game.batterProps || []);
+    const pitcher = renderPropTable(game.pitcherProps || []);
+    return `
+      <div class="game">
+        <div class="game-head">
+          <div class="matchup">${esc(game.awayTeam)}<span class="at">@</span>${esc(game.homeTeam)}</div>
+          <div class="game-time">${fmtTime(game.commenceTime)}</div>
+        </div>
+        <div class="section-label">⚾ Batter Props</div>
+        ${batter}
+        <div class="section-label">🔥 Pitcher Props</div>
+        ${pitcher}
+      </div>`;
+  }
+
+  function renderMeta(data) {
+    const sourcePill = data.source === 'live'
+      ? '<span class="pill live">live</span>'
+      : `<span class="pill cache">${esc(data.source || 'cache')}</span>`;
+    const win = data.window || {};
+    return `
+      <div class="meta-bar">
+        <div>Updated <b>${data.generatedAt ? fmtTime(data.generatedAt) : '—'}</b></div>
+        <div>${sourcePill}</div>
+        <div>Games <b>${data.gamesProcessed || 0}</b></div>
+        <div>Credits left <b>${data.creditsRemaining == null ? '—' : data.creditsRemaining}</b></div>
+        <div>Window <b>${win.active ? 'ACTIVE' : 'closed'}</b></div>
+      </div>`;
+  }
+
+  // --- data load -----------------------------------------------------------
+  const contentEl = document.getElementById('content');
+  const metaEl = document.getElementById('metaBar');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  async function load() {
+    refreshBtn.disabled = true;
+    contentEl.innerHTML =
+      '<div class="state"><div class="spinner"></div><div>Loading player props…</div></div>';
+    try {
+      const res = await fetch(API, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      metaEl.innerHTML = renderMeta(data);
+
+      const games = (data.games || []).filter(
+        g => (g.batterProps && g.batterProps.length) || (g.pitcherProps && g.pitcherProps.length)
+      );
+
+      if (!games.length) {
+        contentEl.innerHTML =
+          '<div class="state"><div class="big">No props available right now</div>' +
+          '<div>The updater fetches props during the active game window. Check back closer to first pitch.</div></div>';
+        return;
+      }
+
+      contentEl.innerHTML = games.map(renderGame).join('');
+      wireExpand();
+    } catch (err) {
+      metaEl.innerHTML = '';
+      contentEl.innerHTML =
+        '<div class="state error"><div class="big">Couldn’t load props</div>' +
+        '<div>' + esc(err.message) + '. Try refreshing in a moment.</div></div>';
+    } finally {
+      refreshBtn.disabled = false;
+    }
+  }
+
+  // Expand/collapse the per-book breakdown under each prop row.
+  function wireExpand() {
+    contentEl.querySelectorAll('.prop-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const idx = row.getAttribute('data-idx');
+        const detail = row.parentElement.querySelector('.book-detail[data-detail="' + idx + '"]');
+        if (!detail) return;
+        const open = detail.style.display !== 'none';
+        detail.style.display = open ? 'none' : '';
+        const caret = row.querySelector('.caret');
+        if (caret) caret.textContent = open ? '▸' : '▾';
+      });
+    });
+  }
+
+  refreshBtn.addEventListener('click', load);
+  load();
+</script>
+</body>
+</html>

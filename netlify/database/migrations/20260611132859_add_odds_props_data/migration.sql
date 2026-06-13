@@ -1,0 +1,1 @@
+ALTER TABLE "odds" ADD COLUMN "props_data" jsonb;

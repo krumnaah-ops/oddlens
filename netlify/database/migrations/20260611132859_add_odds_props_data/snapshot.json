@@ -1,0 +1,155 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "63f1ca28-a2a9-47db-92ed-122633050218",
+  "prevIds": [
+    "90729e11-73d6-44c9-8bcc-8ffa9d1083c0"
+  ],
+  "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "odds",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "serial",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "event_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sport_key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "home_team",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "away_team",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "commence_time",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "odds_data",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "props_data",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "odds"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "odds_pkey",
+      "schema": "public",
+      "table": "odds",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "event_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "odds_event_id_key",
+      "schema": "public",
+      "table": "odds",
+      "entityType": "uniques"
+    }
+  ],
+  "renames": []
+}

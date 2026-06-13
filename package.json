@@ -1,0 +1,16 @@
+{
+  "name": "mlbevtool",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^10.7.9",
+    "@netlify/database": "^1.0.0",
+    "@netlify/functions": "^2.6.0",
+    "drizzle-orm": "beta"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.21",
+    "drizzle-kit": "beta",
+    "typescript": "^5.0.0"
+  }
+}
