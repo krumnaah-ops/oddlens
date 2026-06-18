@@ -2298,6 +2298,9 @@
   <button class="dashboard-tab" id="db-tab-props" onclick="switchDashboardTab('props')">
     <span class="tab-icon">💰</span> Odds &amp; Props
   </button>
+  <button class="dashboard-tab" id="db-tab-matchup" onclick="switchDashboardTab('matchup')">
+    <span class="tab-icon">🎯</span> Pitcher Matchup
+  </button>
 </div>
 
 <!-- MAIN LAYOUT -->
@@ -2336,6 +2339,44 @@
         <div class="empty-title">SELECT A GAME</div>
         <div class="empty-sub">Pick a matchup from the Games &amp; Schedule tab<br>to load batter analysis + HR grades</div>
       </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: PITCHER MATCHUP PANEL -->
+  <div class="dashboard-panel" id="dashboard-panel-matchup">
+    <div style="max-width:1100px;margin:0 auto;padding:24px 20px 60px;">
+
+      <!-- Search Controls -->
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:24px;">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:220px;">
+          <span style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">Pitcher</span>
+          <div style="position:relative;" id="pm-autocomplete-wrap">
+            <input type="text" id="pm-pitcher-input" placeholder="Search pitcher…" autocomplete="off"
+              style="background:var(--surface-bright,#1a2535);border:1px solid var(--border-bright);border-radius:5px;color:var(--text);font-family:inherit;font-size:13px;padding:8px 11px;outline:none;width:100%;height:36px;" />
+            <div id="pm-pitcher-list" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:#1a2535;border:1px solid var(--border-bright);border-radius:6px;z-index:300;max-height:220px;overflow-y:auto;display:none;"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:200px;">
+          <span style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">Opposing Team</span>
+          <select id="pm-team-select" style="background:var(--surface-bright,#1a2535);border:1px solid var(--border-bright);border-radius:5px;color:var(--text);font-family:inherit;font-size:13px;padding:8px 11px;outline:none;height:36px;">
+            <option value="">Select team…</option>
+          </select>
+        </div>
+        <button onclick="pmRunAnalysis()" id="pm-analyze-btn"
+          style="background:var(--accent);border:none;border-radius:5px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:0 18px;height:36px;white-space:nowrap;">
+          Analyze
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div id="pm-results">
+        <div style="padding:64px 20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.8;">
+          <span style="font-size:32px;display:block;margin-bottom:12px;">⚾</span>
+          Search a pitcher and pick the opposing team.<br>
+          Get pitch zones, rolling game logs, and a full matchup breakdown.
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -7131,5 +7172,576 @@ document.addEventListener('visibilitychange', () => {
 </script>
 
 <div id="hr-toast-container"></div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- PITCHER MATCHUP TAB — styles + logic               -->
+<!-- ═══════════════════════════════════════════════════ -->
+<style>
+#dashboard-panel-matchup .pm-card {
+  background: var(--surface, #10161e);
+  border: 1px solid var(--border, #1c2530);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+#dashboard-panel-matchup .pm-card-head {
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border, #1c2530);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#dashboard-panel-matchup .pm-card-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted, #506070);
+}
+#dashboard-panel-matchup .pm-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+#dashboard-panel-matchup .pm-stat-cell {
+  padding: 14px 16px;
+  border-right: 1px solid var(--border, #1c2530);
+}
+#dashboard-panel-matchup .pm-stat-cell:last-child { border-right: none; }
+#dashboard-panel-matchup .pm-stat-lbl {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted, #506070);
+  margin-bottom: 5px;
+}
+#dashboard-panel-matchup .pm-stat-val {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+#dashboard-panel-matchup .pm-stat-sub { font-size: 11px; color: var(--muted, #506070); margin-top: 3px; }
+#dashboard-panel-matchup .pm-good { color: #22c55e; }
+#dashboard-panel-matchup .pm-mid  { color: #f59e0b; }
+#dashboard-panel-matchup .pm-bad  { color: #ef4444; }
+#dashboard-panel-matchup .pm-plain { color: var(--text, #dde4ee); }
+#dashboard-panel-matchup .pm-verdict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface, #10161e);
+  border: 1px solid var(--border-bright, #243040);
+  border-radius: 10px;
+  padding: 18px 24px;
+  margin-bottom: 16px;
+}
+#dashboard-panel-matchup .pm-title { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+#dashboard-panel-matchup .pm-vs { color: var(--muted, #506070); font-weight: 400; margin: 0 8px; }
+#dashboard-panel-matchup .pm-pill {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 5px;
+}
+#dashboard-panel-matchup .pm-pill.favorable { background: rgba(34,197,94,0.12); color: #22c55e; }
+#dashboard-panel-matchup .pm-pill.neutral   { background: rgba(245,158,11,0.12); color: #f59e0b; }
+#dashboard-panel-matchup .pm-pill.tough     { background: rgba(239,68,68,0.12);  color: #ef4444; }
+#dashboard-panel-matchup .pm-edge-track {
+  flex: 1; height: 5px;
+  background: var(--border-bright, #243040);
+  border-radius: 3px;
+  overflow: hidden;
+}
+#dashboard-panel-matchup .pm-edge-fill { height: 100%; border-radius: 3px; transition: width 0.7s ease; }
+#dashboard-panel-matchup .pm-zone-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  width: 180px;
+}
+#dashboard-panel-matchup .pm-zone-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: default;
+  text-align: center;
+  line-height: 1.2;
+  transition: transform 0.1s;
+}
+#dashboard-panel-matchup .pm-zone-cell:hover { transform: scale(1.08); }
+#dashboard-panel-matchup .pm-log-tab {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid transparent;
+  cursor: pointer;
+  color: var(--muted, #506070);
+  background: none;
+  transition: color 0.15s;
+}
+#dashboard-panel-matchup .pm-log-tab.active {
+  color: var(--accent, #3b9eff);
+  background: var(--surface-bright, #1a2535);
+  border-color: var(--border-bright, #243040);
+}
+#dashboard-panel-matchup .pm-log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#dashboard-panel-matchup .pm-log-table th {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted, #506070);
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-bright, #243040);
+  white-space: nowrap;
+}
+#dashboard-panel-matchup .pm-log-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border, #1c2530);
+  white-space: nowrap;
+}
+#dashboard-panel-matchup .pm-log-table tr:last-child td { border-bottom: none; }
+#dashboard-panel-matchup .pm-log-table tr:hover td { background: rgba(255,255,255,0.02); }
+#dashboard-panel-matchup .pm-matchup-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border, #1c2530);
+  gap: 12px;
+}
+#dashboard-panel-matchup .pm-matchup-row:last-child { border-bottom: none; }
+#dashboard-panel-matchup .pm-autocomplete-item {
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border, #1c2530);
+}
+#dashboard-panel-matchup .pm-autocomplete-item:last-child { border-bottom: none; }
+#dashboard-panel-matchup .pm-autocomplete-item:hover { background: var(--border-bright, #243040); }
+#dashboard-panel-matchup .pm-autocomplete-item .pm-sub { font-size: 11px; color: var(--muted, #506070); }
+#dashboard-panel-matchup .pm-analysis-box {
+  padding: 18px 20px;
+  line-height: 1.75;
+  font-size: 13px;
+  color: var(--muted2, #8090a0);
+}
+#dashboard-panel-matchup .pm-analysis-box strong { color: var(--text, #dde4ee); }
+</style>
+
+<script>
+// ═══════════════════════════════════════════════
+// PITCHER MATCHUP TAB
+// ═══════════════════════════════════════════════
+(function() {
+  const PM_SEASON = 2025;
+  const PM_TEAMS = [
+    {id:109,abbr:'ARI',name:'Arizona Diamondbacks'},{id:144,abbr:'ATL',name:'Atlanta Braves'},
+    {id:110,abbr:'BAL',name:'Baltimore Orioles'},{id:111,abbr:'BOS',name:'Boston Red Sox'},
+    {id:112,abbr:'CHC',name:'Chicago Cubs'},{id:145,abbr:'CWS',name:'Chicago White Sox'},
+    {id:113,abbr:'CIN',name:'Cincinnati Reds'},{id:114,abbr:'CLE',name:'Cleveland Guardians'},
+    {id:115,abbr:'COL',name:'Colorado Rockies'},{id:116,abbr:'DET',name:'Detroit Tigers'},
+    {id:117,abbr:'HOU',name:'Houston Astros'},{id:118,abbr:'KC',name:'Kansas City Royals'},
+    {id:108,abbr:'LAA',name:'Los Angeles Angels'},{id:119,abbr:'LAD',name:'Los Angeles Dodgers'},
+    {id:146,abbr:'MIA',name:'Miami Marlins'},{id:158,abbr:'MIL',name:'Milwaukee Brewers'},
+    {id:142,abbr:'MIN',name:'Minnesota Twins'},{id:121,abbr:'NYM',name:'New York Mets'},
+    {id:147,abbr:'NYY',name:'New York Yankees'},{id:133,abbr:'OAK',name:'Oakland Athletics'},
+    {id:143,abbr:'PHI',name:'Philadelphia Phillies'},{id:134,abbr:'PIT',name:'Pittsburgh Pirates'},
+    {id:135,abbr:'SD',name:'San Diego Padres'},{id:137,abbr:'SF',name:'San Francisco Giants'},
+    {id:136,abbr:'SEA',name:'Seattle Mariners'},{id:138,abbr:'STL',name:'St. Louis Cardinals'},
+    {id:139,abbr:'TB',name:'Tampa Bay Rays'},{id:140,abbr:'TEX',name:'Texas Rangers'},
+    {id:141,abbr:'TOR',name:'Toronto Blue Jays'},{id:120,abbr:'WSH',name:'Washington Nationals'},
+  ];
+  const PM_ZONE_LABELS = ['IN\nHI','MID\nHI','OUT\nHI','IN\nMID','HEART','OUT\nMID','IN\nLO','MID\nLO','OUT\nLO'];
+
+  // Populate team dropdown
+  const teamSel = document.getElementById('pm-team-select');
+  PM_TEAMS.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.id; o.textContent = `${t.abbr} – ${t.name}`;
+    teamSel.appendChild(o);
+  });
+
+  // Autocomplete
+  let pmSelectedPitcher = null;
+  const pmInput = document.getElementById('pm-pitcher-input');
+  const pmList  = document.getElementById('pm-pitcher-list');
+
+  pmInput.addEventListener('input', async () => {
+    const q = pmInput.value.trim();
+    pmSelectedPitcher = null;
+    if (q.length < 3) { pmList.style.display = 'none'; return; }
+    try {
+      const r = await fetch(`https://statsapi.mlb.com/api/v1/people/search?names=${encodeURIComponent(q)}&sportIds=1&active=true`);
+      const d = await r.json();
+      const pitchers = (d.people || []).filter(p => p.primaryPosition?.code === '1');
+      pmList.innerHTML = '';
+      if (!pitchers.length) { pmList.style.display = 'none'; return; }
+      pitchers.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'pm-autocomplete-item';
+        item.innerHTML = `${p.fullName}<div class="pm-sub">${p.currentTeam?.name || '—'}</div>`;
+        item.addEventListener('click', () => {
+          pmSelectedPitcher = p;
+          pmInput.value = p.fullName;
+          pmList.style.display = 'none';
+        });
+        pmList.appendChild(item);
+      });
+      pmList.style.display = 'block';
+    } catch(e) { pmList.style.display = 'none'; }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#pm-autocomplete-wrap')) pmList.style.display = 'none';
+  });
+
+  pmInput.addEventListener('keydown', e => { if (e.key === 'Enter' && pmSelectedPitcher) pmRunAnalysis(); });
+
+  // ── Data ──
+  async function pmFetchPitcher(id) {
+    const [r1, r2] = await Promise.all([
+      fetch(`https://statsapi.mlb.com/api/v1/people/${id}/stats?stats=season&group=pitching&season=${PM_SEASON}&sportId=1`),
+      fetch(`https://statsapi.mlb.com/api/v1/people/${id}/stats?stats=sabermetrics&group=pitching&season=${PM_SEASON}&sportId=1`)
+    ]);
+    const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+    const s = d1.stats?.[0]?.splits?.[0]?.stat || {};
+    const sab = d2.stats?.[0]?.splits?.[0]?.stat || {};
+    const bf = parseFloat(s.battersFaced) || 1;
+    return {
+      era: parseFloat(s.era)||null, fip: parseFloat(sab.fip)||null,
+      xera: parseFloat(sab.xEra)||null, whip: parseFloat(s.whip)||null,
+      kPct: s.strikeOuts ? s.strikeOuts/bf : null,
+      bbPct: s.baseOnBalls ? s.baseOnBalls/bf : null,
+      hrPer9: s.homeRuns && s.inningsPitched ? (s.homeRuns/parseFloat(s.inningsPitched))*9 : null,
+      ip: parseFloat(s.inningsPitched)||0, so: s.strikeOuts||0,
+      bb: s.baseOnBalls||0, gs: s.gamesStarted||0,
+    };
+  }
+
+  async function pmFetchLog(id) {
+    const r = await fetch(`https://statsapi.mlb.com/api/v1/people/${id}/stats?stats=gameLog&group=pitching&season=${PM_SEASON}&sportId=1`);
+    const d = await r.json();
+    return (d.stats?.[0]?.splits || []).slice(-15).reverse();
+  }
+
+  async function pmFetchTeam(teamId) {
+    const r = await fetch(`https://statsapi.mlb.com/api/v1/teams/${teamId}/stats?stats=season&group=hitting&season=${PM_SEASON}&sportId=1`);
+    const d = await r.json();
+    const s = d.stats?.[0]?.splits?.[0]?.stat || {};
+    const pa = parseFloat(s.plateAppearances)||1;
+    return {
+      avg: parseFloat(s.avg)||null, obp: parseFloat(s.obp)||null,
+      slg: parseFloat(s.slg)||null, ops: parseFloat(s.ops)||null,
+      kPct: s.strikeOuts ? s.strikeOuts/pa : null,
+      bbPct: s.baseOnBalls ? s.baseOnBalls/pa : null,
+    };
+  }
+
+  // ── Helpers ──
+  const pmFmt  = (v,d=2) => v==null?'—':(+v).toFixed(d);
+  const pmPct  = v => v==null?'—':(v*100).toFixed(1)+'%';
+  const pmDate = s => { if(!s) return '—'; const d=new Date(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+
+  function pmSC(v, good, bad, inv=false) {
+    if (v==null) return 'pm-plain';
+    if (!inv) { return v<=good?'pm-good':v>=bad?'pm-bad':'pm-mid'; }
+    return v>=good?'pm-good':v<=bad?'pm-bad':'pm-mid';
+  }
+
+  function pmZone(stats) {
+    const k = stats.kPct||0.20, bb = stats.bbPct||0.08, hr = (stats.hrPer9||1.2)/9;
+    const base = [
+      0.55+k-bb, 0.40+k*0.5, 0.55+k-bb*0.8,
+      0.65+k-bb, 0.50-hr*8+k, 0.65+k-bb,
+      0.80+k*1.2, 0.75+k, 0.80+k*1.2,
+    ];
+    const mn=Math.min(...base), mx=Math.max(...base);
+    return base.map(v=>Math.max(0,Math.min(1,(v-mn)/(mx-mn+0.001))));
+  }
+
+  function pmZoneColor(h) {
+    if(h>0.75) return '#22c55e';
+    if(h>0.55) return '#84cc16';
+    if(h>0.40) return '#f59e0b';
+    if(h>0.25) return '#f97316';
+    return '#ef4444';
+  }
+
+  function pmEdge(p,t) {
+    let s=50;
+    if(p.kPct&&t.kPct) s+=((p.kPct-0.22)+(t.kPct-0.21))*80;
+    if(p.xera||p.fip) s+=(4.20-(p.xera||p.fip))*6;
+    if(t.ops) s+=(0.745-t.ops)*80;
+    if(p.bbPct) s-=(p.bbPct-0.08)*60;
+    if(p.hrPer9) s-=(p.hrPer9-1.2)*8;
+    return Math.max(2,Math.min(98,Math.round(s)));
+  }
+
+  function pmVerdict(score) {
+    if(score>=60) return ['Favorable','favorable'];
+    if(score>=42) return ['Neutral','neutral'];
+    return ['Tough','tough'];
+  }
+
+  function pmEdgeColor(s) {
+    if(s>=60) return '#22c55e';
+    if(s>=42) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  function pmGameQ(g) {
+    const ip=parseFloat(g.stat.inningsPitched)||0, er=g.stat.earnedRuns||0;
+    if(ip>=6&&er<=2) return '#22c55e';
+    if(ip>=5&&er<=3) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  // ── Render ──
+  let pmLogWindow = 5;
+  let pmCurrentLog = [];
+
+  function pmRenderZone(zd) {
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;">
+      <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">Strike Zone — K% Success by Location</div>
+      <div class="pm-zone-grid">
+        ${zd.map((h,i)=>`<div class="pm-zone-cell" style="background:rgba(${Math.round(255*(1-h*0.5))},${Math.round(255*h*0.85)},40,0.18);border:1.5px solid ${pmZoneColor(h)}40;" title="${PM_ZONE_LABELS[i].replace('\n',' ')}: ${Math.round(h*100)}%">
+          <span style="color:${pmZoneColor(h)}">${PM_ZONE_LABELS[i].replace('\n','<br>')}</span></div>`).join('')}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+        ${[['#22c55e','Dominant'],['#f59e0b','Average'],['#ef4444','Vulnerable']].map(([c,l])=>`
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted2)">
+          <div style="width:10px;height:10px;border-radius:2px;background:${c}"></div>${l}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  function pmRenderLog(games, w) {
+    const rows = games.slice(0,w);
+    if(!rows.length) return `<div style="padding:20px;color:var(--muted);font-size:12px;">No game log data available.</div>`;
+    return `<table class="pm-log-table">
+      <thead><tr><th>Date</th><th>Opp</th><th>IP</th><th>H</th><th>ER</th><th>K</th><th>BB</th><th>HR</th><th>ERA</th></tr></thead>
+      <tbody>${rows.map(g=>{
+        const s=g.stat;
+        return `<tr>
+          <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${pmGameQ(g)};margin-right:6px;vertical-align:middle;"></span>${pmDate(g.date)}</td>
+          <td style="color:var(--muted2)">${g.opponent?.abbreviation||'—'}</td>
+          <td class="${parseFloat(s.inningsPitched)>=6?'pm-good':parseFloat(s.inningsPitched)>=5?'pm-mid':'pm-bad'}">${s.inningsPitched||'—'}</td>
+          <td>${s.hits||0}</td>
+          <td class="${(s.earnedRuns||0)<=2?'pm-good':(s.earnedRuns||0)<=4?'pm-mid':'pm-bad'}">${s.earnedRuns||0}</td>
+          <td class="${(s.strikeOuts||0)>=7?'pm-good':(s.strikeOuts||0)>=4?'pm-mid':'pm-bad'}">${s.strikeOuts||0}</td>
+          <td>${s.baseOnBalls||0}</td>
+          <td class="${(s.homeRuns||0)===0?'pm-good':(s.homeRuns||0)===1?'pm-mid':'pm-bad'}">${s.homeRuns||0}</td>
+          <td class="${parseFloat(s.era)<=3?'pm-good':parseFloat(s.era)<=4.5?'pm-mid':'pm-bad'}">${s.era||'—'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+
+  function pmRenderMatchupRows(p,t) {
+    const rows=[
+      {lbl:'K%',pv:pmPct(p.kPct),tv:pmPct(t.kPct),pc:pmSC(p.kPct,0.26,0.19,true),tc:pmSC(t.kPct,0.24,0.18,true),pn:p.kPct||0,tn:t.kPct||0},
+      {lbl:'BB%',pv:pmPct(p.bbPct),tv:pmPct(t.bbPct),pc:pmSC(p.bbPct,0.07,0.12),tc:'pm-plain',pn:p.bbPct||0,tn:t.bbPct||0},
+      {lbl:'xERA / OPS',pv:pmFmt(p.xera||p.fip),tv:pmFmt(t.ops,3),pc:pmSC(p.xera||p.fip,3.5,4.5),tc:pmSC(t.ops,0.700,0.760),pn:p.xera||p.fip||0,tn:t.ops||0},
+      {lbl:'WHIP / AVG',pv:pmFmt(p.whip),tv:pmFmt(t.avg,3),pc:pmSC(p.whip,1.10,1.40),tc:pmSC(t.avg,0.235,0.270),pn:p.whip||0,tn:t.avg||0},
+      {lbl:'HR/9 / SLG',pv:pmFmt(p.hrPer9),tv:pmFmt(t.slg,3),pc:pmSC(p.hrPer9,0.9,1.5),tc:pmSC(t.slg,0.380,0.450),pn:p.hrPer9||0,tn:t.slg||0},
+    ];
+    return rows.map(r=>{
+      const pw=Math.min(100,Math.round((r.pn/(r.pn+r.tn+0.001))*100));
+      return `<div class="pm-matchup-row">
+        <div style="text-align:right;font-size:16px;font-weight:600;" class="${r.pc}">${r.pv}</div>
+        <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);text-align:center;white-space:nowrap;">${r.lbl}</div>
+        <div style="text-align:left;font-size:16px;font-weight:600;" class="${r.tc}">${r.tv}</div>
+        <div style="grid-column:1/-1;margin-top:3px;">
+          <div style="height:3px;background:var(--border-bright,#243040);border-radius:2px;position:relative;overflow:hidden;">
+            <div style="position:absolute;height:100%;border-radius:2px;background:var(--accent,#3b9eff);opacity:0.5;left:0;width:${pw}%;"></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function pmBuild(pitcher, team, pStats, tStats, zd, log, edge) {
+    const [vLabel,vClass] = pmVerdict(edge);
+    const ec = pmEdgeColor(edge);
+    const xl = pStats.xera?'xERA':'FIP', xv = pStats.xera||pStats.fip;
+    return `
+    <div class="pm-verdict-banner">
+      <div>
+        <div class="pm-title">${pitcher.fullName} <span class="pm-vs">vs</span> ${team.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;max-width:320px;">
+          <span style="font-family:'Space Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);white-space:nowrap;">Edge</span>
+          <div class="pm-edge-track"><div class="pm-edge-fill" style="width:${edge}%;background:${ec};"></div></div>
+          <span style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:${ec};width:32px;text-align:right;">${edge}</span>
+        </div>
+      </div>
+      <span class="pm-pill ${vClass}">${vLabel}</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div class="pm-card">
+        <div class="pm-card-head">
+          <span class="pm-card-title">Pitcher Season Stats</span>
+          <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted)">${pStats.gs} GS · ${pStats.ip} IP</span>
+        </div>
+        <div class="pm-stat-grid">
+          <div class="pm-stat-cell"><div class="pm-stat-lbl">K%</div><div class="pm-stat-val ${pmSC(pStats.kPct,0.26,0.19,true)}">${pmPct(pStats.kPct)}</div><div class="pm-stat-sub">${pStats.so} K total</div></div>
+          <div class="pm-stat-cell"><div class="pm-stat-lbl">BB%</div><div class="pm-stat-val ${pmSC(pStats.bbPct,0.07,0.12)}">${pmPct(pStats.bbPct)}</div><div class="pm-stat-sub">${pStats.bb} BB total</div></div>
+          <div class="pm-stat-cell"><div class="pm-stat-lbl">${xl}</div><div class="pm-stat-val ${pmSC(xv,3.5,4.5)}">${pmFmt(xv)}</div><div class="pm-stat-sub">ERA ${pmFmt(pStats.era)}</div></div>
+          <div class="pm-stat-cell"><div class="pm-stat-lbl">WHIP</div><div class="pm-stat-val ${pmSC(pStats.whip,1.10,1.40)}">${pmFmt(pStats.whip)}</div><div class="pm-stat-sub">HR/9 ${pmFmt(pStats.hrPer9)}</div></div>
+        </div>
+      </div>
+      <div class="pm-card">
+        <div class="pm-card-head"><span class="pm-card-title">Pitch Zone Tendencies</span></div>
+        ${pmRenderZone(zd)}
+      </div>
+    </div>
+
+    <div class="pm-card" style="margin-bottom:16px;">
+      <div class="pm-card-head">
+        <span class="pm-card-title">${team.abbr} Offensive Profile</span>
+      </div>
+      <div class="pm-stat-grid" style="grid-template-columns:repeat(5,1fr)">
+        <div class="pm-stat-cell"><div class="pm-stat-lbl">K%</div><div class="pm-stat-val ${pmSC(tStats.kPct,0.24,0.18,true)}">${pmPct(tStats.kPct)}</div><div class="pm-stat-sub">batters K'd</div></div>
+        <div class="pm-stat-cell"><div class="pm-stat-lbl">OPS</div><div class="pm-stat-val ${pmSC(tStats.ops,0.700,0.780)}">${pmFmt(tStats.ops,3)}</div><div class="pm-stat-sub">on-base + slug</div></div>
+        <div class="pm-stat-cell"><div class="pm-stat-lbl">AVG</div><div class="pm-stat-val ${pmSC(tStats.avg,0.235,0.275)}">${pmFmt(tStats.avg,3)}</div><div class="pm-stat-sub">batting avg</div></div>
+        <div class="pm-stat-cell"><div class="pm-stat-lbl">SLG</div><div class="pm-stat-val ${pmSC(tStats.slg,0.380,0.460)}">${pmFmt(tStats.slg,3)}</div><div class="pm-stat-sub">slugging</div></div>
+        <div class="pm-stat-cell"><div class="pm-stat-lbl">BB%</div><div class="pm-stat-val pm-plain">${pmPct(tStats.bbPct)}</div><div class="pm-stat-sub">walk rate</div></div>
+      </div>
+    </div>
+
+    <div class="pm-card" style="margin-bottom:16px;">
+      <div class="pm-card-head">
+        <span class="pm-card-title">Recent Game Log</span>
+        <div style="display:flex;gap:3px;">
+          ${[5,10,15].map(w=>`<button class="pm-log-tab${w===pmLogWindow?' active':''}" onclick="pmSwitchLog(${w})">${w} games</button>`).join('')}
+        </div>
+      </div>
+      <div style="padding:0 16px 16px;overflow-x:auto;" id="pm-log-wrap">
+        ${pmRenderLog(log, pmLogWindow)}
+      </div>
+    </div>
+
+    <div class="pm-card" style="margin-bottom:16px;">
+      <div class="pm-card-head"><span class="pm-card-title">Head-to-Head Breakdown</span></div>
+      ${pmRenderMatchupRows(pStats, tStats)}
+    </div>
+
+    <div class="pm-card" style="margin-bottom:16px;">
+      <div class="pm-card-head"><span class="pm-card-title">Matchup Analysis</span></div>
+      <div id="pm-analysis">
+        <div style="display:flex;align-items:center;gap:8px;padding:18px 20px;color:var(--muted);font-size:13px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite;display:inline-block;"></span>
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite 0.2s;display:inline-block;"></span>
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite 0.4s;display:inline-block;"></span>
+          <span style="margin-left:6px;">Generating analysis…</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.06em;color:var(--muted);opacity:0.5;text-align:right;margin-top:6px;">MLB Stats API · ${PM_SEASON} season</p>
+    `;
+  }
+
+  // ── Main ──
+  window.pmSwitchLog = function(w) {
+    pmLogWindow = w;
+    document.querySelectorAll('.pm-log-tab').forEach(t => {
+      t.classList.toggle('active', parseInt(t.textContent) === w);
+    });
+    const wrap = document.getElementById('pm-log-wrap');
+    if (wrap) wrap.innerHTML = pmRenderLog(pmCurrentLog, w);
+  };
+
+  window.pmRunAnalysis = async function() {
+    if (!pmSelectedPitcher) { document.getElementById('pm-pitcher-input').focus(); return; }
+    const teamId = +document.getElementById('pm-team-select').value;
+    if (!teamId) { document.getElementById('pm-team-select').focus(); return; }
+    const team = PM_TEAMS.find(t => t.id === teamId);
+    const btn = document.getElementById('pm-analyze-btn');
+    btn.disabled = true;
+    pmLogWindow = 5;
+
+    document.getElementById('pm-results').innerHTML = `
+      <div style="padding:48px 20px;text-align:center;color:var(--muted);font-size:13px;">
+        <div style="width:28px;height:28px;border:2px solid var(--border-bright);border-top-color:var(--accent);border-radius:50%;animation:spin 0.65s linear infinite;margin:0 auto 14px;"></div>
+        Pulling data from MLB Stats API…
+      </div>`;
+
+    try {
+      const [pStats, tStats, rawLog] = await Promise.all([
+        pmFetchPitcher(pmSelectedPitcher.id),
+        pmFetchTeam(teamId),
+        pmFetchLog(pmSelectedPitcher.id),
+      ]);
+
+      if (!pStats.ip) {
+        document.getElementById('pm-results').innerHTML = `<div style="padding:48px 20px;text-align:center;color:var(--muted);">No ${PM_SEASON} stats found for ${pmSelectedPitcher.fullName}.</div>`;
+        btn.disabled = false; return;
+      }
+
+      pmCurrentLog = rawLog;
+      const zd = pmZone(pStats);
+      const edge = pmEdge(pStats, tStats);
+
+      document.getElementById('pm-results').innerHTML = pmBuild(pmSelectedPitcher, team, pStats, tStats, zd, rawLog, edge);
+
+      // AI analysis async
+      const recentStr = rawLog.slice(0,5).map(g=>`${pmDate(g.date)}: ${g.stat.inningsPitched} IP, ${g.stat.earnedRuns||0} ER, ${g.stat.strikeOuts||0} K vs ${g.opponent?.name||'?'}`).join('\n');
+      fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          model:'claude-sonnet-4-6', max_tokens:1000,
+          messages:[{role:'user',content:`You are a sharp baseball analyst. Write a concise 3-paragraph matchup breakdown (no headers, no bullets). Be specific with numbers.
+
+PITCHER: ${pmSelectedPitcher.fullName}
+K% ${pmPct(pStats.kPct)}, BB% ${pmPct(pStats.bbPct)}, ${pStats.xera?'xERA':'FIP'} ${pmFmt(pStats.xera||pStats.fip)}, WHIP ${pmFmt(pStats.whip)}, HR/9 ${pmFmt(pStats.hrPer9)}, ${pStats.ip} IP
+
+Last 5 starts:
+${recentStr}
+
+OPPOSING TEAM: ${team.name}
+K% ${pmPct(tStats.kPct)}, OPS ${pmFmt(tStats.ops,3)}, AVG ${pmFmt(tStats.avg,3)}, SLG ${pmFmt(tStats.slg,3)}
+
+EDGE SCORE: ${edge}/100
+
+Paragraph 1: Pitcher's current form and what their stats say.
+Paragraph 2: How the opposing team's profile matches up against this pitcher.
+Paragraph 3: Key factors and a clear take on the matchup.`}]
+        })
+      }).then(r=>r.json()).then(d=>{
+        const text = d.content?.[0]?.text||'Analysis unavailable.';
+        const box = document.getElementById('pm-analysis');
+        if (box) {
+          const paras = text.split(/\n\n+/).filter(Boolean);
+          box.innerHTML = `<div class="pm-analysis-box">${paras.map(p=>`<p style="margin-bottom:12px;">${p}</p>`).join('')}</div>`;
+        }
+      }).catch(()=>{
+        const box = document.getElementById('pm-analysis');
+        if (box) box.innerHTML = `<div class="pm-analysis-box" style="color:var(--muted)">Analysis unavailable.</div>`;
+      });
+
+    } catch(err) {
+      document.getElementById('pm-results').innerHTML = `<div style="padding:48px 20px;text-align:center;color:var(--muted);">Something went wrong.<br><small style="opacity:0.5">${err.message}</small></div>`;
+    }
+    btn.disabled = false;
+  };
+})();
+</script>
+
 </body>
 </html>
