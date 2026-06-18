@@ -120,11 +120,14 @@
   .date-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(120,196,134,0.10); }
 
   /* LAYOUT */
-  .layout {
-    display: grid;
-    grid-template-columns: 240px 1fr 480px;
-    height: calc(100vh - 88px);
-  }
+/* LAYOUT - Updated for hidden props */
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;   /* Two columns only now */
+  gap: 16px;
+  height: calc(100vh - 88px);
+  padding: 16px;
+}
 
   /* SIDEBAR */
   .sidebar {
@@ -2378,45 +2381,12 @@
   </div>
 
   <!-- TAB 3: PROPS PANEL -->
-   <!-- HR PROPS 8 BOOKS — HIDDEN FOR NOW -->
+  <!-- HR PROPS PANEL — FULLY HIDDEN -->
   <!-- 
   <div class="dashboard-panel" id="dashboard-panel-props">
-    ... (everything inside stays safely commented out) ...
+    (All HR Props content is safely hidden here)
   </div>
   -->
-    <!-- RIGHT: PROPS RAIL -->
-    <div class="props-rail">
-      <div class="props-header" style="display:flex; justify-content:space-between; align-items:center; width:100%; border-bottom: none;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span class="live-dot" id="props-live-dot"></span>
-          <span id="props-rail-title">HR PROPS · 8 BOOKS</span>
-        </div>
-      </div>
-      
-      <!-- PROPS TYPE TABS -->
-      <div class="props-type-tabs">
-        <button class="props-type-tab active" id="props-type-tab-hitters" onclick="switchPropsType('hitters')">Hitters</button>
-        <button class="props-type-tab" id="props-type-tab-pitchers" onclick="switchPropsType('pitchers')">Pitchers</button>
-      </div>
-
-      <!-- PROPS MARKET TABS -->
-      <div class="props-market-tabs">
-        <button class="props-market-tab active" id="market-tab-hr" onclick="switchPropsMarket('hr')">HR</button>
-        <button class="props-market-tab" id="market-tab-hrr" onclick="switchPropsMarket('hrr')">H+R+RBI</button>
-        <button class="props-market-tab" id="market-tab-tb" style="border-right: none;" onclick="switchPropsMarket('tb')">TB</button>
-        <button class="props-market-tab" id="market-tab-k" style="display: none;" onclick="switchPropsMarket('k')">K (SO)</button>
-        <button class="props-market-tab" id="market-tab-outs" style="display: none;" onclick="switchPropsMarket('outs')">OUTS</button>
-      </div>
-
-      <div id="propsRail">
-        <div style="padding:16px 14px;color:var(--muted);font-family:var(--mono);font-size:11px;line-height:1.7">
-          Select a game to see<br>simulated prop lines<br>and value grades.
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
 
 <!-- PLAYER DETAILS MODAL -->
 <div class="player-modal-backdrop" id="playerModalBackdrop" onclick="closePlayerModal(event)">
